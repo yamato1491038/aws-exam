@@ -39,7 +39,7 @@ AWS Solutions Architect Professional (SAP) の模擬問題をAI（Claude Sonnet 
 
 ### 前提条件
 
-- Node.js 20+
+- Node.js 24+
 - AWS CLI (設定済み)
 - AWS SAM CLI
 
