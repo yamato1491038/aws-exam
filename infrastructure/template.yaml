@@ -1,0 +1,228 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: AWS SAP Exam Practice App
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: nodejs20.x
+    MemorySize: 256
+    Architectures:
+      - arm64
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref AnswersTable
+        BEDROCK_MODEL_ID: anthropic.claude-sonnet-4-5-20241022-v1:0
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+
+Resources:
+  # ============================================
+  # DynamoDB
+  # ============================================
+  AnswersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub sap-exam-answers-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: category
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: CategoryIndex
+          KeySchema:
+            - AttributeName: PK
+              KeyType: HASH
+            - AttributeName: category
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  # ============================================
+  # Cognito
+  # ============================================
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub sap-exam-users-${Stage}
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+          RequireUppercase: true
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub sap-exam-client-${Stage}
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      SupportedIdentityProviders:
+        - COGNITO
+
+  # ============================================
+  # API Gateway
+  # ============================================
+  ApiGateway:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Stage
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            AuthorizationScopes:
+              - email
+            IdentitySource: $request.header.Authorization
+            JwtConfiguration:
+              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}
+              audience:
+                - !Ref UserPoolClient
+
+  # ============================================
+  # Lambda Functions
+  # ============================================
+  GenerateQuestionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub sap-exam-generate-question-${Stage}
+      CodeUri: ../backend
+      Handler: dist/handlers/generateQuestion.handler
+      Timeout: 60
+      MemorySize: 512
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-sonnet-4-5-20241022-v1:0
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /questions/generate
+            Method: POST
+
+  SaveAnswerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub sap-exam-save-answer-${Stage}
+      CodeUri: ../backend
+      Handler: dist/handlers/saveAnswer.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AnswersTable
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /answers
+            Method: POST
+
+  GetAnswersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub sap-exam-get-answers-${Stage}
+      CodeUri: ../backend
+      Handler: dist/handlers/getAnswers.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref AnswersTable
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /answers
+            Method: GET
+
+  GetCategoriesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub sap-exam-get-categories-${Stage}
+      CodeUri: ../backend
+      Handler: dist/handlers/getCategories.handler
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /categories
+            Method: GET
+
+  GetStatsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub sap-exam-get-stats-${Stage}
+      CodeUri: ../backend
+      Handler: dist/handlers/getStats.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref AnswersTable
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /answers/stats
+            Method: GET
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Stage}
+
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref UserPool
+
+  UserPoolClientId:
+    Description: Cognito User Pool Client ID
+    Value: !Ref UserPoolClient
+
+  TableName:
+    Description: DynamoDB Table Name
+    Value: !Ref AnswersTable
