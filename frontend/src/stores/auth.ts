@@ -2,18 +2,16 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import {
   signIn,
-  signUp,
   signOut,
-  confirmSignUp,
-  getCurrentUser,
-  type SignInInput,
-  type SignUpInput
+  confirmSignIn,
+  getCurrentUser
 } from 'aws-amplify/auth'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<{ username: string; email: string } | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const needsNewPassword = ref(false)
 
   const isAuthenticated = computed(() => !!user.value)
 
@@ -29,13 +27,20 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function login(email: string, password: string) {
+  async function login(email: string, password: string): Promise<boolean> {
     loading.value = true
     error.value = null
+    needsNewPassword.value = false
     try {
-      const input: SignInInput = { username: email, password }
-      await signIn(input)
+      const result = await signIn({ username: email, password })
+
+      if (result.nextStep.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
+        needsNewPassword.value = true
+        return false // パスワード変更が必要
+      }
+
       await checkAuth()
+      return true // ログイン完了
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'ログインに失敗しました'
       throw e
@@ -44,33 +49,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function register(email: string, password: string) {
+  async function setNewPassword(newPassword: string) {
     loading.value = true
     error.value = null
     try {
-      const input: SignUpInput = {
-        username: email,
-        password,
-        options: {
-          userAttributes: { email }
-        }
-      }
-      await signUp(input)
+      await confirmSignIn({ challengeResponse: newPassword })
+      needsNewPassword.value = false
+      await checkAuth()
     } catch (e) {
-      error.value = e instanceof Error ? e.message : '登録に失敗しました'
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function confirmRegistration(email: string, code: string) {
-    loading.value = true
-    error.value = null
-    try {
-      await confirmSignUp({ username: email, confirmationCode: code })
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : '確認に失敗しました'
+      error.value = e instanceof Error ? e.message : 'パスワード設定に失敗しました'
       throw e
     } finally {
       loading.value = false
@@ -91,11 +78,11 @@ export const useAuthStore = defineStore('auth', () => {
     user,
     loading,
     error,
+    needsNewPassword,
     isAuthenticated,
     checkAuth,
     login,
-    register,
-    confirmRegistration,
+    setNewPassword,
     logout
   }
 })

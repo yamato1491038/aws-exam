@@ -39,15 +39,16 @@ function handleChoiceClick(choice: string) {
 
 function getChoiceClass(choice: string): string {
   const base = 'w-full text-left p-4 rounded-lg border-2 transition '
+  const prefix = choice.split('.')[0].trim()
 
   if (!quizStore.isAnswered) {
-    const isSelected = quizStore.selectedAnswers.includes(choice)
+    const isSelected = quizStore.selectedAnswers.includes(prefix)
     return base + (isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300')
   }
 
   // 回答後
-  const isCorrect = quizStore.currentQuestion?.correctAnswers.includes(choice)
-  const isSelected = quizStore.selectedAnswers.includes(choice)
+  const isCorrect = quizStore.currentQuestion?.correctAnswers.includes(prefix)
+  const isSelected = quizStore.selectedAnswers.includes(prefix)
 
   if (isCorrect) {
     return base + 'border-green-500 bg-green-50'

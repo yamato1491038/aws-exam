@@ -42,16 +42,24 @@ export const useQuizStore = defineStore('quiz', () => {
   function selectAnswer(choice: string) {
     if (isAnswered.value || !currentQuestion.value) return
 
+    // "A. AWS Control Tower..." → "A" を抽出
+    const prefix = choice.split('.')[0].trim()
+
     if (currentQuestion.value.questionType === 'single') {
-      selectedAnswers.value = [choice]
+      selectedAnswers.value = [prefix]
     } else {
-      const index = selectedAnswers.value.indexOf(choice)
+      const index = selectedAnswers.value.indexOf(prefix)
       if (index === -1) {
-        selectedAnswers.value.push(choice)
+        selectedAnswers.value.push(prefix)
       } else {
         selectedAnswers.value.splice(index, 1)
       }
     }
+  }
+
+  function isAnswerSelected(choice: string): boolean {
+    const prefix = choice.split('.')[0].trim()
+    return selectedAnswers.value.includes(prefix)
   }
 
   async function submitAnswer() {
@@ -101,6 +109,7 @@ export const useQuizStore = defineStore('quiz', () => {
     fetchCategories,
     generateQuestion,
     selectAnswer,
+    isAnswerSelected,
     submitAnswer,
     isCorrect,
     reset

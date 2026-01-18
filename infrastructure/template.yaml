@@ -12,7 +12,7 @@ Globals:
     Environment:
       Variables:
         TABLE_NAME: !Ref AnswersTable
-        BEDROCK_MODEL_ID: anthropic.claude-sonnet-4-5-20241022-v1:0
+        BEDROCK_MODEL_ID: !Ref BedrockModelId
 
 Parameters:
   Stage:
@@ -21,6 +21,10 @@ Parameters:
     AllowedValues:
       - dev
       - prod
+  BedrockModelId:
+    Type: String
+    Default: anthropic.claude-3-5-sonnet-20241022-v2:0
+    Description: Bedrock model ID for question generation
 
 Resources:
   # ============================================
@@ -111,8 +115,6 @@ Resources:
         DefaultAuthorizer: CognitoAuthorizer
         Authorizers:
           CognitoAuthorizer:
-            AuthorizationScopes:
-              - email
             IdentitySource: $request.header.Authorization
             JwtConfiguration:
               issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}
@@ -136,7 +138,9 @@ Resources:
             - Effect: Allow
               Action:
                 - bedrock:InvokeModel
-              Resource: !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-sonnet-4-5-20241022-v1:0
+              Resource:
+                - arn:aws:bedrock:*::foundation-model/*
+                - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*
       Events:
         Api:
           Type: HttpApi

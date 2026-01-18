@@ -1,0 +1,23 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - cd frontend && npm ci
+    build:
+      commands:
+        - |
+          cat <<EOF > frontend/.env
+          VITE_API_ENDPOINT=$VITE_API_ENDPOINT
+          VITE_USER_POOL_ID=$VITE_USER_POOL_ID
+          VITE_USER_POOL_CLIENT_ID=$VITE_USER_POOL_CLIENT_ID
+          VITE_REGION=$VITE_REGION
+          EOF
+        - cd frontend && npm run build
+  artifacts:
+    baseDirectory: frontend/dist
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - frontend/node_modules/**/*
