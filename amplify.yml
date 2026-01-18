@@ -6,13 +6,10 @@ frontend:
         - cd frontend && npm ci
     build:
       commands:
-        - |
-          cat <<EOF > frontend/.env
-          VITE_API_ENDPOINT=$VITE_API_ENDPOINT
-          VITE_USER_POOL_ID=$VITE_USER_POOL_ID
-          VITE_USER_POOL_CLIENT_ID=$VITE_USER_POOL_CLIENT_ID
-          VITE_REGION=$VITE_REGION
-          EOF
+        - echo "VITE_API_ENDPOINT=$VITE_API_ENDPOINT" > frontend/.env
+        - echo "VITE_USER_POOL_ID=$VITE_USER_POOL_ID" >> frontend/.env
+        - echo "VITE_USER_POOL_CLIENT_ID=$VITE_USER_POOL_CLIENT_ID" >> frontend/.env
+        - echo "VITE_REGION=$VITE_REGION" >> frontend/.env
         - cd frontend && npm run build
   artifacts:
     baseDirectory: frontend/dist
