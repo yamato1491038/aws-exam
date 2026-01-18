@@ -4,7 +4,7 @@ frontend:
   phases:
     preBuild:
       commands:
-        - npm ci
+        - npm install
     build:
       commands:
         - echo "VITE_API_ENDPOINT=$VITE_API_ENDPOINT" > .env
