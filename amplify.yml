@@ -1,21 +1,20 @@
 version: 1
 frontend:
-  appRoot: frontend
   phases:
     preBuild:
       commands:
-        - npm install
+        - cd frontend && npm install
     build:
       commands:
-        - echo "VITE_API_ENDPOINT=$VITE_API_ENDPOINT" > .env
-        - echo "VITE_USER_POOL_ID=$VITE_USER_POOL_ID" >> .env
-        - echo "VITE_USER_POOL_CLIENT_ID=$VITE_USER_POOL_CLIENT_ID" >> .env
-        - echo "VITE_REGION=$VITE_REGION" >> .env
-        - npm run build
+        - echo "VITE_API_ENDPOINT=$VITE_API_ENDPOINT" > frontend/.env
+        - echo "VITE_USER_POOL_ID=$VITE_USER_POOL_ID" >> frontend/.env
+        - echo "VITE_USER_POOL_CLIENT_ID=$VITE_USER_POOL_CLIENT_ID" >> frontend/.env
+        - echo "VITE_REGION=$VITE_REGION" >> frontend/.env
+        - cd frontend && npm run build
   artifacts:
-    baseDirectory: dist
+    baseDirectory: frontend/dist
     files:
       - '**/*'
   cache:
     paths:
-      - node_modules/**/*
+      - frontend/node_modules/**/*
